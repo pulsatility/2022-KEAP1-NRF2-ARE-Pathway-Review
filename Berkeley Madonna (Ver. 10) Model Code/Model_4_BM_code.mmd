@@ -1,0 +1,259 @@
+<Document>
+<Version> 22 </Version>
+<JMadonnaVersion> 10.2.8 </JMadonnaVersion>
+<Bounds> 0 0 1424 739 </Bounds>
+<NotesEditor>
+<jeditorpane>
+<size>12</size><family>ËÎÌו</family>
+
+
+
+</jeditorpane>
+</NotesEditor>
+<jmadonna.EquationPanel>
+<DocPanel>
+</DocPanel>
+<jeditorpane>
+<size>18</size><family>Serif</family>{Model IV: Positive autoregulation of NRF2 via transcriptional induction of p62}
+;Unit: time = second, concentration = nM
+
+METHOD STIFF
+STARTTIME = 0
+STOPTIME = 3600 * 400
+DT = 0.02
+Minute = Time / 60
+Hour = Minute / 60
+
+{Parameters}
+S 		= 0
+k1 		= 0.00135071
+k2		= 1.87337e-4
+k20 		= 1 *  logn(2) / (100 * 60)
+k3 		= 3.30834e-5
+k4 		=  logn(2) / (6 * 60 * 60)
+k5 		= 1.31138e-4
+k6 		= logn(2) / (13 * 60 * 60)
+k7 		= 0.1
+k8		= 0.1
+k9 		= logn(2) / (6 * 60 * 60) 
+Kd2 		= 1
+
+{Inintial condition}
+init NRF2 	= 1
+init p62 		= 1
+init KEAP1 	= 5
+init KEAP1_p62 	= 1
+
+{To enable or disable p62 induction by NRF2}
+Switch1 = 1
+
+{ODEs}
+NRF2' = k1 - k2 * KEAP1 * Kd2 / (Kd2 + S) * NRF2 - k20 * NRF2
+p62' = k3 * (1 - Switch1 + Switch1 * NRF2) - k4 * p62 - k7 * KEAP1 * p62 + k8 * KEAP1_p62
+KEAP1' =  k5 - k6 * KEAP1 - k7 * KEAP1 * p62 + k8 * KEAP1_p62 
+KEAP1_p62' =  k7 * KEAP1 * p62 - k8 * KEAP1_p62 - k9 * KEAP1_p62 
+
+{Composite variables}
+KEAP1_tot = KEAP1 + KEAP1_p62
+p62_tot = p62 + KEAP1_p62
+
+
+
+
+
+
+
+
+<size>12</size>
+
+</jeditorpane>
+</jmadonna.EquationPanel>
+
+<imethod> stiff </imethod>
+<jmadonna.ParameterPanel>
+<DocPanel>
+</DocPanel>
+<ParamSets>
+</ParamSets>
+</jmadonna.ParameterPanel>
+<jmadonna.MultiPanel>
+<DocPanel>
+</DocPanel>
+<DividerPercent> 1.0 </DividerPercent>
+<Orientation> -1 </Orientation>
+<idx> 0 </idx>
+<TabSplitter>
+<SelectedIndex> 1 </SelectedIndex>
+<graph.COutputFrame>
+<DocPanel>
+<Name>
+Graph 3
+</Name>
+</DocPanel>
+<overlay> 1 </overlay>
+
+<SingleView>
+<graph.COutputView>
+<Name> Graph </Name>
+<GraphToolBar>
+<Grid> 1 </Grid>
+</GraphToolBar>
+<Plot>
+<LineWidth> 1 </LineWidth>
+</Plot>
+<OV_XVAR>
+<VI_SYMBOL> Hour </VI_SYMBOL>
+</OV_XVAR>
+<OV_YVARS>
+<OV_YVAR_I>
+<VI_SYMBOL> NRF2 </VI_SYMBOL>
+<VI_SHOW> false </VI_SHOW>
+<VI_Y2AXIS> false </VI_Y2AXIS>
+</OV_YVAR_I>
+<OV_YVAR_I>
+<VI_SYMBOL> p62 </VI_SYMBOL>
+<VI_SHOW> true </VI_SHOW>
+<VI_Y2AXIS> false </VI_Y2AXIS>
+</OV_YVAR_I>
+<OV_YVAR_I>
+<VI_SYMBOL> KEAP1 </VI_SYMBOL>
+<VI_SHOW> false </VI_SHOW>
+<VI_Y2AXIS> false </VI_Y2AXIS>
+</OV_YVAR_I>
+<OV_YVAR_I>
+<VI_SYMBOL> KEAP1_p62 </VI_SYMBOL>
+<VI_SHOW> false </VI_SHOW>
+<VI_Y2AXIS> false </VI_Y2AXIS>
+</OV_YVAR_I>
+<OV_YVAR_I>
+<VI_SYMBOL> KEAP1_tot </VI_SYMBOL>
+<VI_SHOW> false </VI_SHOW>
+<VI_Y2AXIS> false </VI_Y2AXIS>
+</OV_YVAR_I>
+<OV_YVAR_I>
+<VI_SYMBOL> p62_tot </VI_SYMBOL>
+<VI_SHOW> true </VI_SHOW>
+<VI_Y2AXIS> false </VI_Y2AXIS>
+</OV_YVAR_I>
+</OV_YVARS>
+<OV_TABLE> false </OV_TABLE>
+<OV_FFT> false </OV_FFT>
+<OV_COLORS> true </OV_COLORS>
+<OV_STYLES> false </OV_STYLES>
+<OV_OSCMODE> false </OV_OSCMODE>
+<OV_LINES> true </OV_LINES>
+<OV_POINTS> true </OV_POINTS>
+<OV_GRID> true </OV_GRID>
+<OV_DBTN> true </OV_DBTN>
+<OV_LEGEND> false </OV_LEGEND>
+<OV_PARAMS> false </OV_PARAMS>
+<OV_READOUT> false </OV_READOUT>
+<OV_INITCOND> false </OV_INITCOND>
+<OV_RDOUTFXFY> 0.0 0.0 </OV_RDOUTFXFY>
+<OV_ZSNORMAL>
+</OV_ZSNORMAL>
+<OV_ZSFFT>
+<ZS_SIZE> 1 </ZS_SIZE>
+<ZS_I>
+<ZS_XLOG> true </ZS_XLOG>
+<ZS_Y1LOG> false </ZS_Y1LOG>
+<ZS_Y2LOG> false </ZS_Y2LOG>
+</ZS_I>
+</OV_ZSFFT>
+<OV_ZSOSCMODE>
+</OV_ZSOSCMODE>
+<OV_AUTOLABEL> 0 1 </OV_AUTOLABEL>
+<OV_AUTOLABEL> 1 1 </OV_AUTOLABEL>
+<OV_AUTOLABEL> 2 1 </OV_AUTOLABEL>
+<OV_X1LABELS>  Hour </OV_X1LABELS>
+<OV_Y1LABELS>  p62, p62_tot </OV_Y1LABELS>
+<OV_Y2LABELS>   </OV_Y2LABELS>
+<OV_LEGENDXY> 0.855538 0.046617 </OV_LEGENDXY>
+<OV_PARAMSXY> 0.855538 0.046617 </OV_PARAMSXY>
+<OV_COLORTABLE> 0 <OV_COLORTABLE>
+</graph.COutputView>
+</SingleView>
+</graph.COutputFrame>
+<graph.COutputFrame>
+<DocPanel>
+<Name>
+Parameter Plot...
+</Name>
+</DocPanel>
+<ivar> S </ivar>
+<paramGraph>
+<nRuns> 40 </nRuns>
+<initValue> 0.01 </initValue>
+<finalValue> 100.0  </finalValue>
+<isArithmetic> 0 </isArithmetic>
+<selectedParam> S </selectedParam>
+<yvarmodel> !23!@1@#2#$!24!@1@#3#$!25!@1@#4#$!26!@1@#5#$!33!@1@#11#$!32!@1@#10#$%$ </yvarmodel>
+</paramGraph>
+
+<SingleView>
+<graph.COutputView>
+<Name> Graph </Name>
+<GraphToolBar>
+<Grid> 1 </Grid>
+</GraphToolBar>
+<Plot>
+<LineWidth> 1 </LineWidth>
+</Plot>
+<OV_TABLE> false </OV_TABLE>
+<OV_FFT> false </OV_FFT>
+<OV_COLORS> true </OV_COLORS>
+<OV_STYLES> false </OV_STYLES>
+<OV_OSCMODE> false </OV_OSCMODE>
+<OV_LINES> true </OV_LINES>
+<OV_POINTS> true </OV_POINTS>
+<OV_GRID> true </OV_GRID>
+<OV_DBTN> true </OV_DBTN>
+<OV_LEGEND> false </OV_LEGEND>
+<OV_PARAMS> false </OV_PARAMS>
+<OV_READOUT> false </OV_READOUT>
+<OV_INITCOND> false </OV_INITCOND>
+<OV_RDOUTFXFY> 0.0 0.0 </OV_RDOUTFXFY>
+<OV_ZSNORMAL>
+<ZS_SIZE> 1 </ZS_SIZE>
+<ZS_I>
+<ZS_XLOG> true </ZS_XLOG>
+<ZS_Y1LOG> true </ZS_Y1LOG>
+<ZS_Y2LOG> false </ZS_Y2LOG>
+</ZS_I>
+</OV_ZSNORMAL>
+<OV_ZSFFT>
+<ZS_SIZE> 1 </ZS_SIZE>
+<ZS_I>
+<ZS_XLOG> true </ZS_XLOG>
+<ZS_Y1LOG> false </ZS_Y1LOG>
+<ZS_Y2LOG> false </ZS_Y2LOG>
+</ZS_I>
+</OV_ZSFFT>
+<OV_ZSOSCMODE>
+</OV_ZSOSCMODE>
+<OV_AUTOLABEL> 0 1 </OV_AUTOLABEL>
+<OV_AUTOLABEL> 1 1 </OV_AUTOLABEL>
+<OV_AUTOLABEL> 2 1 </OV_AUTOLABEL>
+<OV_X1LABELS>  S </OV_X1LABELS>
+<OV_Y1LABELS>  NRF2(final), p62(final), KEAP1(final), KEAP1_p62(final), p62_tot(final), KEAP1_tot(final) </OV_Y1LABELS>
+<OV_Y2LABELS>   </OV_Y2LABELS>
+<OV_LEGENDXY> 0.30000001192092896 0.5 </OV_LEGENDXY>
+<OV_PARAMSXY> 0.30000001192092896 0.5 </OV_PARAMSXY>
+<OV_COLORTABLE> 0 <OV_COLORTABLE>
+</graph.COutputView>
+</SingleView>
+</graph.COutputFrame>
+</TabSplitter>
+<idx> 1 </idx>
+<TabSplitter>
+<SelectedIndex> -1 </SelectedIndex>
+</TabSplitter>
+</jmadonna.MultiPanel>
+
+<ChemicalReactionDialog>
+<ShowRates> true </ShowRates>
+<ShowConsts> true </ShowConsts>
+<ShowInits> true </ShowInits>
+<ShowDiffs> true </ShowDiffs>
+</ChemicalReactionDialog>
+</Document>
