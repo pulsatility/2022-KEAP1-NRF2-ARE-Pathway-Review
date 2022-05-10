@@ -1,0 +1,190 @@
+---
+### Model V: Activation of NRF2 via nuclear exclusion of BACH1
+### Unit: time = second, concentration = nM
+---
+  
+```{r}
+# Load Package
+library(deSolve)
+```
+
+
+```{r}
+## ---------------------------------
+## Parameter values
+## --------------------------------- 
+parameters <- c(
+  S = 0,
+  k1 = 100 * log(2) / (20 * 60),
+  k2 = log(2) / (20 * 60),
+  k3 = 0.1,     ## Titration mode: k3 = 0.1, Equilibrium mode: k3 = 0.01
+  k4 = 0.01,    ## Titration mode: k4 = 0.01, Equilibrium mode: k4 = 0.1
+  k5 = 0.1,
+  k6 = 0.1,
+  k7 = 10 * log(2) / (60 * 60),
+  k8 = log(2) / (60 * 60),
+  Kd7 = 1,
+  Ki7 = 0.2
+)
+## ----------------------------------
+## Initial conditions
+## ----------------------------------
+y0 <- c(
+  BACH1c  = 0,
+  BACH1n  = 100,    ## Titration mode: BACH1n = 100, Equilibrium mode: BACH1n = 10000
+  BACH1n_sMAF = 0,
+  NRF2 = 10,
+  NRF2_sMAF = 0,
+  sMAF = 10,
+  Targetgene = 0
+)
+
+## ----------------------------------
+## Differential equations to solve
+## ----------------------------------
+Model_V <- function(times, y, parms)
+{
+  with(as.list(c(y, parms)),
+       {
+         #ODEs for the state variables
+          dBACH1cdt = k1 * BACH1n * S - k2 * BACH1c
+          dBACH1ndt = - k1 * S * BACH1n + k2 * BACH1c - k3 * BACH1n * sMAF + k4 * BACH1n_sMAF
+          dBACH1n_sMAFdt = k3 * BACH1n * sMAF - k4 * BACH1n_sMAF
+          dNRF2dt = - k5 * NRF2 * sMAF + k6 * NRF2_sMAF
+          dNRF2_sMAFdt = k5 * NRF2 * sMAF - k6 * NRF2_sMAF
+          dsMAFdt = - k3 * BACH1n * sMAF + k4 * BACH1n_sMAF - k5 * NRF2 * sMAF + k6 * NRF2_sMAF
+          dTargetgenedt =  k7 * NRF2_sMAF / (Kd7 * (1 + BACH1n_sMAF / Ki7) + NRF2_sMAF) - k8 * Targetgene 
+         #Return simulated value of Y at each time step
+         list(c(dBACH1cdt, dBACH1ndt, dBACH1n_sMAFdt, dNRF2dt, dNRF2_sMAFdt, dsMAFdt, dTargetgenedt)); #They need to follow the same order as the ODEs
+       })
+}
+
+## ----------------------------------
+## Run simulation
+## ----------------------------------
+#Time span of simulation
+tspan <- seq(0, 86400, by = 100)
+#Call the lsoda function to numerically solve the ODEs
+output <- lsoda(y = y0, times = tspan, func = Model_V, parms = parameters)
+#Optional: show the result of the first 6 time steps
+head(output)
+```
+
+
+```{r}
+## ----------------------------------
+## Plotting simulation results
+## ----------------------------------
+par(mar = c(5, 5, 1, 1), mgp = c(2, 0.5, 0)) # mar(figure margins):bottom, left, top, right; mgp(label position): distance from label, scale, tick marks to plot 
+plot(output, xlab = "Time (S)", ylab = "Protein Levels (nM)", las=0.5, cex.lab=1.4, cex.axis=1.3, col="blue")
+```
+
+
+```{r}
+## Dose Response (Fig. 6B)
+## -------------------------------------
+## Titration mode
+logdose <- seq(-3,3, by = 0.1)
+dose <- 10^logdose
+
+sMAF_ss <- c()          #A vector to hold steady-state sMAF values
+NRF2_sMAF_ss <- c()     #A vector to hold steady-state NRF2_sMAF values
+BACH1n_sMAF_ss <- c()   #A vector to hold steady-state BACH1n_sMAF values
+BACH1n_ss <- c()        #A vector to hold steady-state BACH1n values
+Targetgene_ss <- c()    #A vector to hold steady-state Targetgene values
+
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_V, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  sMAF_ss <- c(sMAF_ss,output[lastpoint_index,"sMAF"])
+  NRF2_sMAF_ss <- c(NRF2_sMAF_ss,output[lastpoint_index,"NRF2_sMAF"])
+  BACH1n_sMAF_ss <- c(BACH1n_sMAF_ss,output[lastpoint_index,"BACH1n_sMAF"])
+  BACH1n_ss <- c(BACH1n_ss,output[lastpoint_index,"BACH1n"])
+  Targetgene_ss <- c(Targetgene_ss,output[lastpoint_index,"Targetgene"])
+}
+plot(dose, sMAF_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.001, 1000), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+title(main = "Titration mode")
+
+par(new=TRUE)
+plot(dose, NRF2_sMAF_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.001, 1000), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="red") 
+
+par(new=TRUE)
+plot(dose, BACH1n_sMAF_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.001, 1000), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+par(new=TRUE)
+plot(dose, BACH1n_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.001, 1000), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+par(new=TRUE)
+plot(dose, Targetgene_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.001, 1000), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="green") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(10,1, legend=c("sMaf", "NRF2_sMaf", "BACH1n_sMaf","BACH1n","Targetgene"), 
+       col=c("blue","red","purple","orange","green") , lty=1, cex=1)
+
+```
+
+
+```{r}
+## Dose Response (Fig. 6C)
+## -------------------------------------
+## Equilibrium mode
+parameters["k3"]= 0.01      ## Titration mode: k3 = 0.1, Equilibrium mode: k3 = 0.01
+parameters["k4"]= 0.1       ## Titration mode: k4 = 0.01, Equilibrium mode: k4 = 0.1
+y0["BACH1n"]= 10000         ## Titration mode: BACH1n = 100, Equilibrium mode: BACH1n = 10000
+
+logdose <- seq(-3,5, by = 0.1)
+dose <- 10^logdose
+
+sMAF_ss <- c()          #A vector to hold steady-state sMAF values
+NRF2_sMAF_ss <- c()     #A vector to hold steady-state NRF2_sMAF values
+BACH1n_sMAF_ss <- c()   #A vector to hold steady-state BACH1n_sMAF values
+BACH1n_ss <- c()        #A vector to hold steady-state BACH1n values
+Targetgene_ss <- c()    #A vector to hold steady-state Targetgene values
+
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_V, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  sMAF_ss <- c(sMAF_ss,output[lastpoint_index,"sMAF"])
+  NRF2_sMAF_ss <- c(NRF2_sMAF_ss,output[lastpoint_index,"NRF2_sMAF"])
+  BACH1n_sMAF_ss <- c(BACH1n_sMAF_ss,output[lastpoint_index,"BACH1n_sMAF"])
+  BACH1n_ss <- c(BACH1n_ss,output[lastpoint_index,"BACH1n"])
+  Targetgene_ss <- c(Targetgene_ss,output[lastpoint_index,"Targetgene"])
+}
+plot(dose, sMAF_ss, log="xy", xlim = c(0.001, 100000), ylim = c(0.0001, 10000), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+title(main = "Equilibrium mode")
+
+par(new=TRUE)
+plot(dose, NRF2_sMAF_ss, log="xy", xlim = c(0.001, 100000), ylim = c(0.0001, 10000), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="red") 
+
+par(new=TRUE)
+plot(dose, BACH1n_sMAF_ss, log="xy", xlim = c(0.001, 100000), ylim = c(0.0001, 10000), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+par(new=TRUE)
+plot(dose, BACH1n_ss, log="xy", xlim = c(0.001, 100000), ylim = c(0.0001, 10000), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+par(new=TRUE)
+plot(dose, Targetgene_ss, log="xy", xlim = c(0.001, 100000), ylim = c(0.0001, 10000), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="green") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(160,1, legend=c("sMaf", "NRF2_sMaf", "BACH1n_sMaf","BACH1n","Targetgene"), 
+       col=c("blue","red","purple","orange","green") , lty=1, cex=1)
+
+```
+
+

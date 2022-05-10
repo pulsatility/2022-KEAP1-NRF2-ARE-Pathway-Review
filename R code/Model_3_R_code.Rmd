@@ -1,0 +1,217 @@
+---
+### Model III: Positive autoregulation of NRF2 and sMaf via transcriptional self-induction
+### Unit: time = second, concentration = nM
+---
+  
+```{r}
+# Load Package
+library(deSolve)
+```
+
+
+```{r}
+## ---------------------------------
+## Parameter values
+## --------------------------------- 
+parameters <- c(
+  S = 0,
+  k10 = 7 * log(2) / (10 * 60),
+  k1 = 65 * log(2) / (10 * 60),
+  k2 = log(2) / (10 * 60),
+  k3 = log(2) / (100 * 60),
+  k40 = 6 * log(2) / (100 * 60),
+  k4 = 83 * log(2) / (100 * 60),
+  k5 = log(2) / (100 * 60),
+  k6 = log(2) / (100 * 60),
+  k7 = 0.001,
+  k8 = 0.1,
+  Kd1 = 20,
+  Kd2 = 1.5,
+  Kd4 = 20
+)
+## ----------------------------------
+## Initial conditions
+## ----------------------------------
+y0 <- c(
+  NRF2_free 	= 1,
+  sMAF 			  = 10,
+  NRF2_sMAF   = 1 
+)
+## ----------------------------------
+## Differential equations to solve
+## ----------------------------------
+Model_III <- function(times, y, parms)
+{
+  with(as.list(c(y, parms)),
+       {
+         #ODEs for the state variables
+         dNRF2_freedt		=  k10 + k1 * NRF2_sMAF / (Kd1 + NRF2_sMAF) - k2 * Kd2 / (Kd2 + S) * NRF2_free - k3 * NRF2_free - k7 * NRF2_free * sMAF + k8 * NRF2_sMAF
+         dsMAFdt		=  k40 + k4 * NRF2_sMAF / (Kd4 + NRF2_sMAF) - k5 * sMAF  - k7 * NRF2_free * sMAF + k8 * NRF2_sMAF
+         dNRF2_sMAFdt = - k6 * NRF2_sMAF + k7 * NRF2_free * sMAF - k8 * NRF2_sMAF
+         #Return simulated value of Y at each time step
+         list(c(dNRF2_freedt, dsMAFdt, dNRF2_sMAFdt)); #They need to follow the same order as the ODEs
+       })
+}
+
+## ----------------------------------
+## Run simulation
+## ----------------------------------
+#Time span of simulation
+tspan <- seq(0, 360000, by = 100)
+#Call the lsoda function to numerically solve the ODEs
+output <- lsoda(y = y0, times = tspan, func = Model_III, parms = parameters)
+#Optional: show the result of the first 6 time steps
+head(output)
+```
+
+
+```{r}
+## ----------------------------------
+## Plotting simulation results
+## ----------------------------------
+par(mar = c(5, 5, 1, 1), mgp = c(2, 0.5, 0)) # mar(figure margins):bottom, left, top, right; mgp(label position): distance from label, scale, tick marks to plot 
+plot(output, xlab = "Time (S)", ylab = "Protein Levels (nM)", las=0.5, cex.lab=1.4, cex.axis=1.3, col="blue")
+```
+
+
+```{r}
+## Dose Response (Fig. 4B)
+## -------------------------------------
+logdose <- seq(-1,2, by = 0.05)
+dose <- 10^logdose
+
+NRF2_free_ss <- c()     #A vector to hold steady-state NRF2_free values
+sMAF_ss <- c()          #A vector to hold steady-state sMAF values
+NRF2_sMAF_ss <- c()     #A vector to hold steady-state NRF2_sMAF values
+
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_III, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2_free_ss <- c(NRF2_free_ss,output[lastpoint_index,"NRF2_free"])
+  sMAF_ss <- c(sMAF_ss,output[lastpoint_index,"sMAF"])
+  NRF2_sMAF_ss <- c(NRF2_sMAF_ss,output[lastpoint_index,"NRF2_sMAF"])
+}
+
+plot(dose, NRF2_free_ss, log="xy", xlim = c(0.1, 100), ylim = c(0.1, 1000), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+
+par(new=TRUE)
+plot(dose, sMAF_ss, log="xy", xlim = c(0.1, 100), ylim = c(0.1, 1000), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="red") 
+
+par(new=TRUE)
+plot(dose, NRF2_sMAF_ss, log="xy", xlim = c(0.1, 100), ylim = c(0.1, 1000), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+par(new=TRUE)
+NRF2tot_ss = NRF2_free_ss + NRF2_sMAF_ss 
+plot(dose, NRF2tot_ss, log="xy", xlim = c(0.1, 100), ylim = c(0.1, 1000), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+par(new=TRUE)
+sMAFtot_ss = sMAF_ss + NRF2_sMAF_ss
+plot(dose, sMAFtot_ss, log="xy", xlim = c(0.1, 100), ylim = c(0.1, 1000), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="green") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(4,4, legend=c("NRF2_free","sMAF","NRF2_sMAF","NRF2tot","sMAFtot"), col=c("blue","red","orange","purple","green") , lty=1, cex=1)
+```
+
+
+```{r}
+## Dose Response (Fig. 4C);
+## -------------------------------------
+## default curve
+plot(dose, NRF2_sMAF_ss, log="xy", xlim = c(0.1, 100), ylim = c(0.1, 100), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+title(main = "NRF2_sMAF")
+
+
+## To disable NRF2 auto-induction, by setting the "k1 * S / (Kd1 + S)" term in dNRF2_freedt differential equation to "k1 * 1 / (Kd1 + 1)"
+Model_III_a <- function(times, y, parms) 
+{
+  with(as.list(c(y, parms)),
+       {
+         dNRF2_freedt		=  k10 + k1 * 1 / (Kd1 + 1) - k2 * Kd2 / (Kd2 + S) * NRF2_free - k3 * NRF2_free - k7 * NRF2_free * sMAF + k8 * NRF2_sMAF # setting "k1 * S / (Kd1 + S)"  to "k1 * 1 / (Kd1 + 1)" to disable NRF2 auto-induction
+         dsMAFdt		=  k40 + k4 * NRF2_sMAF / (Kd4 + NRF2_sMAF) - k5 * sMAF  - k7 * NRF2_free * sMAF + k8 * NRF2_sMAF
+         dNRF2_sMAFdt = - k6 * NRF2_sMAF + k7 * NRF2_free * sMAF - k8 * NRF2_sMAF
+         list(c(dNRF2_freedt, dsMAFdt, dNRF2_sMAFdt)); 
+       })
+}
+
+logdose <- seq(-1,2, by = 0.1)
+dose <- 10^logdose
+NRF2_sMAFss <- c()  
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_III_a, parms = parameters)
+  lastpoint_index <- length(output[,"NRF2_sMAF"])
+  NRF2_sMAFss <- c(NRF2_sMAFss,output[lastpoint_index,"NRF2_sMAF"])
+}
+par(new=TRUE)
+plot(dose, NRF2_sMAFss, log="xy", xlim = c(0.1, 100), ylim = c(0.1, 100), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="green") 
+
+
+
+## To disable sMAF auto-induction, by setting the "k4 * S / (Kd4 + S)" term in dsMAFdt differential equation to "k4 * 1 / (Kd4 + 1)"
+Model_III_b <- function(times, y, parms) 
+{
+  with(as.list(c(y, parms)),
+       {
+         dNRF2_freedt		=  k10 + k1 * NRF2_sMAF / (Kd1 + NRF2_sMAF) - k2 * Kd2 / (Kd2 + S) * NRF2_free - k3 * NRF2_free - k7 * NRF2_free * sMAF + k8 * NRF2_sMAF
+         dsMAFdt		=  k40 + k4 * 1 / (Kd4 + 1) - k5 * sMAF  - k7 * NRF2_free * sMAF + k8 * NRF2_sMAF # setting "k4 * S / (Kd4 + S)"  to "k4 * 1 / (Kd4 + 1)" to disable sMAF auto-induction
+         dNRF2_sMAFdt = - k6 * NRF2_sMAF + k7 * NRF2_free * sMAF - k8 * NRF2_sMAF
+         list(c(dNRF2_freedt, dsMAFdt, dNRF2_sMAFdt)); 
+       })
+}
+
+logdose <- seq(-1,2, by = 0.1)
+dose <- 10^logdose
+NRF2_sMAFss <- c()  
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_III_b, parms = parameters)
+  lastpoint_index <- length(output[,"NRF2_sMAF"])
+  NRF2_sMAFss <- c(NRF2_sMAFss,output[lastpoint_index,"NRF2_sMAF"])
+}
+par(new=TRUE)
+plot(dose, NRF2_sMAFss, log="xy", xlim = c(0.1, 100), ylim = c(0.1, 100), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+
+
+## To disable both NRF2 and sMAF auto-induction
+Model_III_c <- function(times, y, parms) 
+{
+  with(as.list(c(y, parms)),
+       {
+         dNRF2_freedt		=  k10 + k1 * 1 / (Kd1 + 1) - k2 * Kd2 / (Kd2 + S) * NRF2_free - k3 * NRF2_free - k7 * NRF2_free * sMAF + k8 * NRF2_sMAF # setting "k1 * S / (Kd1 + S)"  to "k1 * 1 / (Kd1 + 1)" to disable NRF2 auto-induction
+         dsMAFdt		=  k40 + k4 * 1 / (Kd4 + 1) - k5 * sMAF  - k7 * NRF2_free * sMAF + k8 * NRF2_sMAF # setting "k4 * S / (Kd4 + S)"  to "k4 * 1 / (Kd4 + 1)" to disable sMAF auto-induction
+         dNRF2_sMAFdt = - k6 * NRF2_sMAF + k7 * NRF2_free * sMAF - k8 * NRF2_sMAF
+         list(c(dNRF2_freedt, dsMAFdt, dNRF2_sMAFdt));
+       })
+}
+
+logdose <- seq(-1,2, by = 0.1)
+dose <- 10^logdose
+NRF2_sMAFss <- c()  
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_III_c, parms = parameters)
+  lastpoint_index <- length(output[,"NRF2_sMAF"])
+  NRF2_sMAFss <- c(NRF2_sMAFss,output[lastpoint_index,"NRF2_sMAF"])
+}
+par(new=TRUE)
+plot(dose, NRF2_sMAFss, log="xy", xlim = c(0.1, 100), ylim = c(0.1, 100), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(4,1, legend=c("NRF2loop+, sMAFloop+","NRF2loop-, sMAFloop+","NRF2loop+, sMAFloop-","NRF2loop-, sMAFloop-"), col=c("blue","green","orange","purple") , lty=1, cex=1) 	
+```  
+
+

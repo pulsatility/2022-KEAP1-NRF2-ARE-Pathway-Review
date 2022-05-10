@@ -1,0 +1,205 @@
+---
+### Model IV: Positive autoregulation of NRF2 via transcriptional induction of p62
+### Unit: time = second, concentration = nM
+---
+  
+```{r}
+# Load Package
+library(deSolve)
+```
+
+
+```{r}
+## ---------------------------------
+## Parameter values
+## --------------------------------- 
+parameters <- c(
+  S 		= 0,
+  k1 		= 0.00135071,
+  k2		= 1.87337e-4,
+  k20 	= 1 * log(2) / (100 * 60),
+  k3 		= 3.30834e-5,
+  k4 		=  log(2) / (6 * 60 * 60),
+  k5 		= 1.31138e-4,
+  k6 		= log(2) / (13 * 60 * 60),
+  k7 		= 0.1,
+  k8		= 0.1,
+  k9 		= log(2) / (6 * 60 * 60),
+  Kd2 	= 1
+)
+## ----------------------------------
+## Initial conditions
+## ----------------------------------
+y0 <- c(
+  NRF2_free 	  = 1,
+  p62 		      = 1,
+  KEAP1 	      = 5,
+  KEAP1_p62     = 1
+)
+## ----------------------------------
+## Differential equations to solve
+## ----------------------------------
+Model_IV <- function(times, y, parms)
+{
+  with(as.list(c(y, parms)),
+       {
+         #ODEs for the state variables
+         dNRF2_freedt = k1 - k2 * KEAP1 * Kd2 / (Kd2 + S) * NRF2_free - k20 * NRF2_free
+         dp62dt = k3 * NRF2_free - k4 * p62 - k7 * KEAP1 * p62 + k8 * KEAP1_p62
+         dKEAP1dt =  k5 - k6 * KEAP1 - k7 * KEAP1 * p62 + k8 * KEAP1_p62 
+         dKEAP1_p62dt =  k7 * KEAP1 * p62 - k8 * KEAP1_p62 - k9 * KEAP1_p62 
+         #Return simulated value of Y at each time step
+         list(c(dNRF2_freedt, dp62dt, dKEAP1dt, dKEAP1_p62dt)); #They need to follow the same order as the ODEs
+       })
+}
+
+## ----------------------------------
+## Run simulation
+## ----------------------------------
+#Time span of simulation
+tspan <- seq(0, 1440000, by = 100)
+#Call the lsoda function to numerically solve the ODEs
+output <- lsoda(y = y0, times = tspan, func = Model_IV, parms = parameters)
+#Optional: show the result of the first 6 time steps
+head(output)
+```
+
+
+```{r}
+## ----------------------------------
+## Plotting simulation results
+## ----------------------------------
+par(mar = c(5, 5, 1, 1), mgp = c(2, 0.5, 0)) # mar(figure margins):bottom, left, top, right; mgp(label position): distance from label, scale, tick marks to plot
+plot(output, xlab = "Time (S)", ylab = "Protein Levels (nM)", las=0.5, cex.lab=1.4, cex.axis=1.3, col="blue")
+```
+
+
+```{r}
+## Dose Response (Fig. 5B)
+## -------------------------------------
+logdose <- seq(-2,2, by = 0.05)
+dose <- 10^logdose
+
+NRF2_free_ss <- c()     #A vector to hold steady-state NRF2_free values
+p62_ss <- c()           #A vector to hold steady-state p62 values
+KEAP1_ss <- c()         #A vector to hold steady-state KEAP1 values
+KEAP1_p62_ss <- c()     #A vector to hold steady-state KEAP1_p62 values
+
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_IV, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2_free_ss <- c(NRF2_free_ss,output[lastpoint_index,"NRF2_free"])
+  p62_ss <- c(p62_ss,output[lastpoint_index,"p62"])
+  KEAP1_ss <- c(KEAP1_ss,output[lastpoint_index,"KEAP1"])
+  KEAP1_p62_ss <- c(KEAP1_p62_ss,output[lastpoint_index,"KEAP1_p62"])
+}
+plot(dose, NRF2_free_ss, log="xy", xlim = c(0.01, 100), ylim = c(0.1, 100), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="black") 
+
+par(new=TRUE)
+plot(dose, p62_ss, log="xy", xlim = c(0.01, 100), ylim = c(0.1, 100), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+par(new=TRUE)
+plot(dose, KEAP1_ss, log="xy", xlim = c(0.01, 100), ylim = c(0.1, 100), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="red") 
+
+par(new=TRUE)
+plot(dose, KEAP1_p62_ss, log="xy", xlim = c(0.01, 100), ylim = c(0.1, 100), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+par(new=TRUE)
+p62_tot_ss = p62_ss + KEAP1_p62_ss
+plot(dose, p62_tot_ss, log="xy", xlim = c(0.01, 100), ylim = c(0.1, 100), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+
+par(new=TRUE)
+KEAP1_tot_ss = KEAP1_ss + KEAP1_p62_ss
+plot(dose, KEAP1_tot_ss, log="xy", xlim = c(0.01, 100), ylim = c(0.1, 100), xlab="S", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="green") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(8,4, legend=c("NRF2_free","sMAF","p62","KEAP1","KEAP1_p62","p62tot","KEAP1tot"), 
+       col=c("blue","red","orange","purple","green") , lty=1, cex=1)
+
+```
+
+
+```{r}
+## Dose Response (Fig. 5C)
+## -------------------------------------
+
+## default curve
+plot(dose, NRF2_free_ss, log="xy", xlim = c(0.01, 100), ylim = c(0.1, 100), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+title(main="NRF2")
+
+
+## Absence of autophagy of KEAP1 by p62, by setting k9 = k6, and k5 = 1.27573e-4 so that free KEAP1 remains at the same basal level as in the intact model
+
+parameters["k5"]= 1.27573e-4              #  default k5 = 1.31138e-4
+parameters["k9"]= log(2) / (13 * 60 * 60) #  default k9 = log(2) / (6 * 60 * 60)
+
+logdose <- seq(-2,2, by = 0.05)
+dose <- 10^logdose
+
+NRF2_free_ss <- c()  
+
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_IV, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2_free_ss <- c(NRF2_free_ss,output[lastpoint_index,"NRF2_free"])
+}
+par(new=TRUE)
+plot(dose, NRF2_free_ss, log="xy", xlim = c(0.01, 100), ylim = c(0.1, 100), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="red") 
+
+
+
+## Absence of induction of p62 by NRF2, by setting the "k3*S" term in dp62dt differential equation to "k3*1"
+
+## Reset parameters to default values
+parameters["k5"]= 1.31138e-4              #  default k5 = 1.31138e-4
+parameters["k9"]= log(2) / (6 * 60 * 60)  #  default k9 = log(2) / (6 * 60 * 60)
+
+Model_IV_a <- function(times, y, parms)
+{
+  with(as.list(c(y, parms)),
+       {
+         #ODEs for the state variables
+         dNRF2_freedt = k1 - k2 * KEAP1 * Kd2 / (Kd2 + S) * NRF2_free - k20 * NRF2_free
+         dp62dt = k3 * 1 - k4 * p62 - k7 * KEAP1 * p62 + k8 * KEAP1_p62 # setting "k3*S" to "k3*1" to disable p62 induction by NRF2
+         dKEAP1dt =  k5 - k6 * KEAP1 - k7 * KEAP1 * p62 + k8 * KEAP1_p62 
+         dKEAP1_p62dt =  k7 * KEAP1 * p62 - k8 * KEAP1_p62 - k9 * KEAP1_p62 
+         #Return simulated value of Y at each time step
+         list(c(dNRF2_freedt, dp62dt, dKEAP1dt, dKEAP1_p62dt)); #They need to follow the same order as the ODEs
+       })
+}
+
+logdose <- seq(-2,2, by = 0.05)
+dose <- 10^logdose
+NRF2_free_ss <- c()  
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_IV_a, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2_free_ss <- c(NRF2_free_ss,output[lastpoint_index,"NRF2_free"])
+}
+par(new=TRUE)
+plot(dose, NRF2_free_ss, log="xy", xlim = c(0.01, 100), ylim = c(0.1, 100), xlab="Dose (S)", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(0.2,0.8, legend=c("Default","Absence of autophagy of KEAP1 by p62", "Absence of induction of p62 by NRF2"), 
+       col=c("blue", "red", "orange") , lty=1, cex=1)
+
+```
+
+

@@ -1,0 +1,259 @@
+---
+### Model II: Multistep signaling leading to nuclear NRF2 accumulation
+### Unit: time = second, concentration = nM
+---
+  
+```{r}
+# Load Package
+library(deSolve)
+```
+
+
+```{r}
+## ---------------------------------
+## Parameter values
+## --------------------------------- 
+parameters <- c(
+  S = 0,
+  k0 = 0.01,
+  k1 = 1.42326,
+  k2 = log(2)  / (10 * 60),
+  k3 = log(2)  / (100 * 60),
+  k4 = log(2) / (15 * 60),
+  k5 = 0.00731656,
+  Kd1 = 10,
+  Kd2 = 0.1,
+  Kd5 = 0.1,
+  k6 = log(2) / (100 * 60),
+  KEAP1tot = 11,
+  Switch1 = 1, # To enable or disable signaling step 1
+  Switch2 = 1, # To enable or disable signaling step 2
+  Switch3 = 1  # To enable or disable signaling step 3 
+)
+## ----------------------------------
+## Initial conditions
+## ----------------------------------
+y0 <- c(
+  NRF2c 			  = 1,
+  NRF2n 			  = 1
+)
+## ----------------------------------
+## Differential equations to solve
+## ----------------------------------
+Model_II <- function(times, y, parms)
+{
+  with(as.list(c(y, parms)),
+       {
+         KEAP1 = KEAP1tot * Kd2 / (Kd2 + (S*Switch1+1-Switch1))
+         #ODEs for the state variables
+         dNRF2cdt		=  k0 + k1 * (S*Switch2+1-Switch2)/ (Kd1 + (S*Switch2+1-Switch2)) - k2 * KEAP1 * NRF2c - k4 * NRF2c + k5 * Kd5 / (Kd5 + (S*Switch3+1-Switch3)) * NRF2n - k3 * NRF2c
+         dNRF2ndt		=  k4 * NRF2c - k5 * Kd5 / (Kd5 + (S*Switch3+1-Switch3)) * NRF2n - k6 * NRF2n
+         #Return simulated value of Y at each time step
+         list(c(dNRF2cdt, dNRF2ndt)); #They need to follow the same order as the ODEs
+       })
+}
+
+## ----------------------------------
+## Run simulation
+## ----------------------------------
+#Time span of simulation
+tspan <- seq(0, 360000, by = 100)
+#Call the lsoda function to numerically solve the ODEs
+output <- lsoda(y = y0, times = tspan, func = Model_II, parms = parameters)
+#Optional: show the result of the first 6 time steps
+head(output)
+```
+
+
+```{r}
+## ----------------------------------
+## Plotting simulation results
+## ----------------------------------
+par(mar = c(5, 5, 1, 1), mgp = c(2, 0.5, 0)) # mar(figure margins):bottom, left, top, right; mgp(label position): distance from label, scale, tick marks to plot 
+plot(output, xlab = "Time (S)", ylab = "Protein Levels (nM)", las=0.5, cex.lab=1.4, cex.axis=1.3, col="blue")
+```
+
+
+```{r}
+## Dose Response (Fig. 3B)
+## -------------------------------------
+logdose <- seq(-3,3, by = 0.1)
+dose <- 10^logdose
+
+NRF2c_ss <- c()  #A vector to hold steady-state NRF2c values
+NRF2n_ss <- c()  #A vector to hold steady-state NRF2n values
+
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_II, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2c_ss <- c(NRF2c_ss,output[lastpoint_index,"NRF2c"])
+  NRF2n_ss <- c(NRF2n_ss,output[lastpoint_index,"NRF2n"])
+}
+
+plot(dose, NRF2c_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.01, 10000), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+par(new=TRUE)
+plot(dose, NRF2n_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.01, 10000), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(60,20, legend=c("NRF2c","NRF2n"), col=c("orange","blue") , lty=1, cex=1)
+
+```
+
+
+```{r}
+# default curve
+plot(dose, NRF2n_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.01, 10000), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+title(main = "NRF2n")
+
+
+# To disable signaling steps 2 and 3
+logdose <- seq(-3,3, by = 0.1)
+dose <- 10^logdose
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 0  # default=1
+parameters["Switch3"]= 0  # default=1
+NRF2n_ss <- c() 
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_II, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2n_ss <- c(NRF2n_ss,output[lastpoint_index,"NRF2n"])
+}
+
+par(new=TRUE)
+plot(dose, NRF2n_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.01, 10000), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+
+
+# To disable signaling steps 1 and 3
+logdose <- seq(-3,3, by = 0.1)
+dose <- 10^logdose
+parameters["Switch1"]= 0  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 0  # default=1
+NRF2n_ss <- c() 
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_II, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2n_ss <- c(NRF2n_ss,output[lastpoint_index,"NRF2n"])
+}
+
+par(new=TRUE)
+plot(dose, NRF2n_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.01, 10000), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+
+# To disable signaling steps 1 and 2
+logdose <- seq(-3,3, by = 0.1)
+dose <- 10^logdose
+parameters["Switch1"]= 0  # default=1
+parameters["Switch2"]= 0  # default=1
+parameters["Switch3"]= 1  # default=1
+NRF2n_ss <- c() 
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_II, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2n_ss <- c(NRF2n_ss,output[lastpoint_index,"NRF2n"])
+}
+
+par(new=TRUE)
+plot(dose, NRF2n_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.01, 10000), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="green") 
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(60,20, legend=c("1+2+3","1","2","3"), col=c("blue","orange","purple","green") , lty=1, cex=1)
+```
+
+```{r}
+## Dose Response (Fig. 3D)
+## -------------------------------------
+## default curve
+logdose <- seq(-3,3, by = 0.1)
+dose <- 10^logdose
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 1  # default=1
+NRF2n_ss <- c() 
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_II, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2n_ss <- c(NRF2n_ss,output[lastpoint_index,"NRF2n"])
+}
+
+plot(dose, NRF2n_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.01, 10000), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+title(main = "NRF2n")
+
+
+
+# To disable signaling step 3
+logdose <- seq(-3,3, by = 0.1)
+dose <- 10^logdose
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 0  # default=1
+NRF2n_ss <- c() 
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_II, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2n_ss <- c(NRF2n_ss,output[lastpoint_index,"NRF2n"])
+}
+
+par(new=TRUE)
+plot(dose, NRF2n_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.01, 10000), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+
+
+# To disable signaling step 2
+logdose <- seq(-3,3, by = 0.1)
+dose <- 10^logdose
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 0  # default=1
+parameters["Switch3"]= 1  # default=1
+NRF2n_ss <- c() 
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_II, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2n_ss <- c(NRF2n_ss,output[lastpoint_index,"NRF2n"])
+}
+
+par(new=TRUE)
+plot(dose, NRF2n_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.01, 10000), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+
+
+# To disable signaling step 1
+logdose <- seq(-3,3, by = 0.1)
+dose <- 10^logdose
+parameters["Switch1"]= 0  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 1  # default=1
+NRF2n_ss <- c() 
+for( i in dose)
+{
+  parameters["S"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_II, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  NRF2n_ss <- c(NRF2n_ss,output[lastpoint_index,"NRF2n"])
+}
+
+par(new=TRUE)
+plot(dose, NRF2n_ss, log="xy", xlim = c(0.001, 1000), ylim = c(0.01, 10000), xlab="S", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="green") 
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(60,20, legend=c("1+2+3","1+2","1+3","2+3"), col=c("blue","orange","purple","green") , lty=1, cex=1)
+```
+
+

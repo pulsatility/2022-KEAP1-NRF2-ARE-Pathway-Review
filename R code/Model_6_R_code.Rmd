@@ -1,0 +1,487 @@
+---
+### Model VI: Multistep inhibition of BACH1 by heme
+### Unit: time = second, concentration = nM
+---
+  
+```{r}
+# Load Package
+library(deSolve)
+```
+
+
+```{r}
+## ---------------------------------
+## Parameter values
+## --------------------------------- 
+parameters <- c(
+  Heme = 1,
+  k0 = 20 * log(2) / (100 * 60),
+  k1 = 0.1 * log(2) / (0.2 * 60),
+  k2 = log(2) / (20 * 60),
+  k3 = log(2) / (100 * 60),
+  k30 = log(2) / (360 * 60),
+  k4 = 0.01,
+  k5 = 0.01,
+  k6 = log(2) / (100 * 60),
+  k60 = log(2) / (360 * 60),
+  k7 = log(2) / (100 * 60),
+  k70 = log(2) / (360 * 60),
+  Switch1 = 1, # To enable or disable signaling step 1
+  Switch2 = 1, # To enable or disable signaling step 2
+  Switch3 = 1  # To enable or disable signaling step 3 
+)
+
+## ----------------------------------
+## Initial conditions
+## ----------------------------------
+y0 <- c(
+  BACH1c = 10,
+  BACH1n = 10,
+  ARE = 1,
+  BACH1nARE = 0
+)
+
+## ----------------------------------
+## Differential equations to solve
+## ----------------------------------
+Model_VI <- function(times, y, parms)
+{
+  with(as.list(c(y, parms)),
+       {
+        dBACH1cdt = k0 + k1 * (Heme * Switch1 + 1 - Switch1)  * BACH1n - k2 * BACH1c - k3 *  (Heme * Switch3 + 1 - Switch3)  * BACH1c - k30 * BACH1c
+        dBACH1ndt = - k1 *  (Heme * Switch1 + 1 - Switch1)  * BACH1n + k2 * BACH1c - k4 * BACH1n * ARE + k5 *  (Heme * Switch2 + 1 - Switch2)  * BACH1nARE - k6 *  (Heme * Switch3 + 1 - Switch3)  * BACH1n - k60 * BACH1n
+        dAREdt = - k4 * BACH1n * ARE + k5 * (Heme * Switch2 + 1 - Switch2) * BACH1nARE + k7 * (Heme * Switch3 + 1 - Switch3)  * BACH1nARE + k70 * BACH1nARE
+        dBACH1nAREdt = k4 * BACH1n * ARE - k5 * (Heme * Switch2 + 1 - Switch2)  * BACH1nARE - k7 *  (Heme * Switch3 + 1 - Switch3)   * BACH1nARE - k70 * BACH1nARE
+        list(c(dBACH1cdt, dBACH1ndt, dAREdt, dBACH1nAREdt)); 
+       })
+}
+
+## ----------------------------------
+## Run simulation
+## ----------------------------------
+#Time span of simulation
+tspan <- seq(0, 360000, by = 100)
+#Call the lsoda function to numerically solve the ODEs
+output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+#Optional: show the result of the first 6 time steps
+head(output)
+```
+
+
+```{r}
+## ----------------------------------
+## Plotting simulation results
+## ----------------------------------
+par(mar = c(5, 5, 1, 1), mgp = c(2, 0.5, 0)) # mar(figure margins):bottom, left, top, right; mgp(label position): distance from label, scale, tick marks to plot 
+plot(output, xlab = "Time (S)", ylab = "Protein Levels (nM)", las=0.5, cex.lab=1.4, cex.axis=1.3, col="blue")
+```
+
+
+```{r}
+## Dose Response (Fig. 7B)
+## -------------------------------------
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+BACH1c_ss <- c()  #A vector to hold steady-state BACH1c values
+BACH1n_ss <- c()  #A vector to hold steady-state BACH1n values
+ARE_ss <- c()  #A vector to hold steady-state ARE values
+BACH1nARE_ss <- c()  #A vector to hold steady-state BACH1nARE values
+
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  BACH1c_ss <- c(BACH1c_ss,output[lastpoint_index,"BACH1c"])
+  BACH1n_ss <- c(BACH1n_ss,output[lastpoint_index,"BACH1n"])
+  ARE_ss <- c(ARE_ss,output[lastpoint_index,"ARE"])
+  BACH1nARE_ss <- c(BACH1nARE_ss,output[lastpoint_index,"BACH1nARE"])
+}
+
+plot(dose, BACH1c_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 100), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="red") 
+
+par(new=TRUE)
+plot(dose, BACH1n_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 100), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+par(new=TRUE)
+plot(dose, ARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 100), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l",pch=20, col="purple") 
+
+par(new=TRUE)
+plot(dose, BACH1nARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 100), xlab="Heme", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(40,100, legend=c("BACH1nARE", "BACH1c", "BACH1n","ARE"), 
+       col=c("blue","red","orange","purple") , lty=1, cex=1)
+
+```
+
+
+```{r}
+## Dose Response (Fig. 7C)
+## -------------------------------------
+
+## default curve
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 1  # default=1
+
+ARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  ARE_ss <- c(ARE_ss,output[lastpoint_index,"ARE"])
+}
+plot(dose, ARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+title(main = "ARE")
+
+
+
+# To disable signaling steps 2 and 3
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 0  # default=1
+parameters["Switch3"]= 0  # default=1
+
+ARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  ARE_ss <- c(ARE_ss,output[lastpoint_index,"ARE"])
+}
+par(new=TRUE)
+plot(dose, ARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+
+
+# To disable signaling steps 1 and 3
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 0  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 0  # default=1
+
+ARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  ARE_ss <- c(ARE_ss,output[lastpoint_index,"ARE"])
+}
+par(new=TRUE)
+plot(dose, ARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+
+
+# To disable signaling steps 1 and 2
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 0  # default=1
+parameters["Switch2"]= 0  # default=1
+parameters["Switch3"]= 1  # default=1
+
+ARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  ARE_ss <- c(ARE_ss,output[lastpoint_index,"ARE"])
+}
+par(new=TRUE)
+plot(dose, ARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="red") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(80,0.5, legend=c("1+2+3", "1", "2","3"), 
+       col=c("blue", "orange","purple", "red") , lty=1, cex=1)
+```
+
+
+```{r}
+## Dose Response (Fig. 7D)
+## -------------------------------------
+
+## default curve
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 1  # default=1
+
+BACH1nARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  BACH1nARE_ss <- c(BACH1nARE_ss,output[lastpoint_index,"BACH1nARE"])
+}
+plot(dose, BACH1nARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+title(main = "BACH1nARE")
+
+
+
+# To disable signaling steps 2 and 3
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 0  # default=1
+parameters["Switch3"]= 0  # default=1
+
+BACH1nARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  BACH1nARE_ss <- c(BACH1nARE_ss,output[lastpoint_index,"BACH1nARE"])
+}
+par(new=TRUE)
+plot(dose, BACH1nARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+
+
+# To disable signaling steps 1 and 3
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 0  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 0  # default=1
+
+BACH1nARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  BACH1nARE_ss <- c(BACH1nARE_ss,output[lastpoint_index,"BACH1nARE"])
+}
+par(new=TRUE)
+plot(dose, BACH1nARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+
+
+# To disable signaling steps 1 and 2
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 0  # default=1
+parameters["Switch2"]= 0  # default=1
+parameters["Switch3"]= 1  # default=1
+
+BACH1nARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  BACH1nARE_ss <- c(BACH1nARE_ss,output[lastpoint_index,"BACH1nARE"])
+}
+par(new=TRUE)
+plot(dose, BACH1nARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="red") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(80,0.5, legend=c("1+2+3", "1", "2","3"), 
+       col=c("blue", "orange","purple", "red") , lty=1, cex=1)
+
+```
+
+
+
+```{r}
+## Dose Response (Fig. 7E)
+## -------------------------------------
+
+## default curve
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 1  # default=1
+
+ARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  ARE_ss <- c(ARE_ss,output[lastpoint_index,"ARE"])
+}
+plot(dose, ARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+title(main = "ARE")
+
+
+
+# To disable signaling step 3
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 0  # default=1
+
+ARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  ARE_ss <- c(ARE_ss,output[lastpoint_index,"ARE"])
+}
+par(new=TRUE)
+plot(dose, ARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+
+
+# To disable signaling step 2
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 0  # default=1
+parameters["Switch3"]= 1  # default=1
+
+ARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  ARE_ss <- c(ARE_ss,output[lastpoint_index,"ARE"])
+}
+par(new=TRUE)
+plot(dose, ARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="red") 
+
+
+
+# To disable signaling step 1
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 0  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 1  # default=1
+
+ARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  ARE_ss <- c(ARE_ss,output[lastpoint_index,"ARE"])
+}
+par(new=TRUE)
+plot(dose, ARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(80,0.5, legend=c("1+2+3", "1+2", "1+3","2+3"), 
+       col=c("blue", "purple", "red", "orange") , lty=1, cex=1)
+```
+
+
+```{r}
+## Dose Response (Fig. 7F)
+## -------------------------------------
+
+## default curve
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 1  # default=1
+
+BACH1nARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  BACH1nARE_ss <- c(BACH1nARE_ss,output[lastpoint_index,"BACH1nARE"])
+}
+plot(dose, BACH1nARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="", ylab ="", 
+     cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="blue") 
+title(main = "BACH1nARE")
+
+
+
+# To disable signaling step 3
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 0  # default=1
+
+BACH1nARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  BACH1nARE_ss <- c(BACH1nARE_ss,output[lastpoint_index,"BACH1nARE"])
+}
+par(new=TRUE)
+plot(dose, BACH1nARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="purple") 
+
+
+
+# To disable signaling step 2
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 1  # default=1
+parameters["Switch2"]= 0  # default=1
+parameters["Switch3"]= 1  # default=1
+
+BACH1nARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  BACH1nARE_ss <- c(BACH1nARE_ss,output[lastpoint_index,"BACH1nARE"])
+}
+par(new=TRUE)
+plot(dose, BACH1nARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="red") 
+
+
+
+# To disable signaling step 1
+logdose <- seq(-2,3, by = 0.1)
+dose <- 10^logdose
+
+parameters["Switch1"]= 0  # default=1
+parameters["Switch2"]= 1  # default=1
+parameters["Switch3"]= 1  # default=1
+
+BACH1nARE_ss <- c() 
+for( i in dose)
+{
+  parameters["Heme"]=i
+  output <- lsoda(y = y0, times = tspan, func = Model_VI, parms = parameters)
+  lastpoint_index <- length(output[,"time"])
+  BACH1nARE_ss <- c(BACH1nARE_ss,output[lastpoint_index,"BACH1nARE"])
+}
+par(new=TRUE)
+plot(dose, BACH1nARE_ss, log="xy", xlim = c(0.01, 1000), ylim = c(0.0001, 1), xlab="Heme", ylab ="", cex.lab =1.4, cex.axis=1.3, las=0.5, lwd = 2, type="l", pch=20, col="orange") 
+
+title(ylab="Protein Levels (nM)", line=2.5, cex.lab=1.4)
+grid()
+legend(80,0.5, legend=c("1+2+3", "1+2", "1+3","2+3"), 
+       col=c("blue", "purple", "red",  "orange") , lty=1, cex=1)
+```
+
+
